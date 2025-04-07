@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import { toast } from 'react-toastify';
@@ -9,6 +9,8 @@ export default function Profile() {
     full_name: '',
     avatar_url: ''
   });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,6 +32,45 @@ export default function Profile() {
       toast.error(error.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function uploadAvatar(event) {
+    try {
+      setUploading(true);
+      if (!event.target.files || event.target.files.length === 0) {
+        throw new Error('Please select an image to upload.');
+      }
+
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      let { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase
+        .storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      setProfile({...profile, avatar_url: publicUrl});
+      toast.success('Avatar uploaded successfully!');
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -56,6 +97,36 @@ export default function Profile() {
   return (
     <div className="max-w-md mx-auto py-8">
       <h2 className="text-2xl font-bold mb-6">Your Profile</h2>
+      <div className="flex items-center space-x-4 mb-6">
+        {profile.avatar_url ? (
+          <img
+            src={profile.avatar_url}
+            alt="Avatar"
+            className="w-16 h-16 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-gray-300 flex items-center justify-center">
+            <span className="text-gray-500">No photo</span>
+          </div>
+        )}
+        <div>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current.click()}
+            disabled={uploading}
+            className="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded"
+          >
+            {uploading ? 'Uploading...' : 'Change'}
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={uploadAvatar}
+            accept="image/*"
+            className="hidden"
+          />
+        </div>
+      </div>
       <form onSubmit={updateProfile} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Email</label>
