@@ -10,8 +10,27 @@ export function generateCSV(data, columns) {
   return [headers, ...rows].join('\n');
 }
 
-export function downloadCSV(content, filename) {
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+export function downloadFile(content, filename, format = 'csv') {
+  let mimeType, ext;
+  switch(format) {
+    case 'json':
+      mimeType = 'application/json';
+      ext = 'json';
+      break;
+    case 'excel':
+      mimeType = 'application/vnd.ms-excel';
+      ext = 'xls';
+      break;
+    default: // csv
+      mimeType = 'text/csv;charset=utf-8;';
+      ext = 'csv';
+  }
+
+  if (!filename.endsWith(`.${ext}`)) {
+    filename = `${filename}.${ext}`;
+  }
+
+  const blob = new Blob([content], { type: mimeType });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   
